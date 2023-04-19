@@ -1,43 +1,60 @@
-using System.Collections;
-using System.Collections.Generic;
 using Unity.VisualScripting;
-using UnityEditor.Tilemaps;
 using UnityEngine;
-using UnityEngine.UI;
-using static System.Net.Mime.MediaTypeNames;
-using static UnityEngine.RuleTile.TilingRuleOutput;
 
 public class PlayerController2D : MonoBehaviour
 {
-    
-   public static PlayerController2D Instance;
+
+    public static PlayerController2D Instance;
 
     [Header("Variables")]
-    public StateMachine stateMachine;   
+    
     public Animator animator;
+    [SerializeField] private SpriteRenderer spriteRenderer;
     public Rigidbody2D rb;
-    private Vector3 scale;
-   
+    
+    
     [Header("Movement")]
-    public float velocity;
-    [SerializeField] private float speed;
-
+    [SerializeField] private float walkSpeed;
+    public float WalkSpeed => walkSpeed;
+    
     [Header("Jump")]
     public float jumpForce;
-    public bool isGrounded;
-    public bool isJumping;
-    public UnityEngine.Transform groundChecker;
+    public bool isGrounded
+    {
+        get
+        {
+            return (Physics2D.Raycast(transform.position, Vector2.down, groundCheckDistance, groundMask)) ;
+        }
+    }
+    
+    [SerializeField] private float groundCheckDistance;
+
     public LayerMask groundMask;
-   
+    [Header("Attack")]
+    public bool isAttacking;
+
+
+    public StateMachine<PLayerStateType> StateMachine { get; } = new();
 
 
 
 
     void Start()
     {
-        stateMachine = new StateMachine(new DefaultState(this));
-       scale = transform.localScale;
+        //Registriamo tutti gli stati possibili
+        StateMachine.RegisterState(PLayerStateType.Idle, new PLayerIdleState(this));
+        StateMachine.RegisterState(PLayerStateType.Walk, new PlayerWalkState(this));
+        StateMachine.RegisterState(PLayerStateType.Fall, new PlayerFallState(this)); 
+        StateMachine.RegisterState(PLayerStateType.Jump, new PlayerJumpState(this));
+        StateMachine.RegisterState(PLayerStateType.Attack, new PlayerAttackState(this));
+
+
+        //setto lo stato iniziale
+        StateMachine.SetState(PLayerStateType.Idle);
+
+       
         animator = GetComponentInChildren<Animator>();
+        spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         rb = GetComponent<Rigidbody2D>();
 
 
@@ -50,55 +67,30 @@ public class PlayerController2D : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        //movement
-        float horizontal = Input.GetAxis("Horizontal") * Time.deltaTime;
-       velocity = horizontal * speed;
-       Flip(horizontal);  
-        transform.Translate(velocity, 0, 0);
+        StateMachine.Update();
 
-
-        CheckForGround();
-
-        if (Input.GetButtonDown("Jump") && isGrounded && !isJumping)
-        {
-            Jump();
-        }
-       
-       
-
-        stateMachine.StateUpdate();
-    }
-    public void Jump()
-    {
-       
-        isJumping = true;
-        animator.SetBool("isJumping", isJumping);
-        
-        stateMachine.SetState(new JumpState(this));
-        
     }
 
-    public void CheckForGround()
+    private void Attack()
     {
-        isGrounded = Physics2D.OverlapCircle(groundChecker.position, 0.3f, groundMask);
-        animator.SetBool("isGrounded", isGrounded);
-
-       
+        isAttacking = true;
+        animator.SetBool("isAttacking", isAttacking);
+        //stateMachine.SetState(new AttackState(this));
     }
-    public void Flip(float velocity)
+
+    
+    
+    public void FlipSprite(float speed)
     {
-        if(velocity > 0)
-        {
-            Vector3 temp = transform.localScale;
-            temp.x = scale.x;
-            transform.localScale = temp;         
-        }
-        else if(velocity < 0) 
-        {
-            Vector3 temp = transform.localScale;
-            temp.x = -scale.x;
-            transform.localScale = temp;
-            
-        }
+        spriteRenderer.flipX = speed < 0f;
+    }
+
+    public void HorizontalMovement()
+    {
+        float horizontal = Input.GetAxis("Horizontal");
+        FlipSprite(horizontal);
+        horizontal *= Time.deltaTime * WalkSpeed;
+        transform.Translate(horizontal, 0, 0);
+
     }
 }

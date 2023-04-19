@@ -1,47 +1,48 @@
+using System;
+using System.Collections.Generic;
+using System.Net.Http.Headers;
 using UnityEngine;
+using UnityEngine.SocialPlatforms;
 
-public abstract class IState
-{
-
-    public PlayerController2D owner;
-
-    public virtual void Enter() { }
-    public virtual void Execute() { }
-    public virtual void Exit() { }
-
+public enum PLayerStateType 
+{ 
+    Idle,
+    Walk,
+    Jump,
+    Attack,
+    Fall
 }
-public class StateMachine : MonoBehaviour
+
+
+public class StateMachine<T> where T : Enum
 {
-    public IState statoCorrente;
+    private Dictionary<T, IState> _states = new();
+    public IState _currentState;
 
-    public StateMachine(IState stato)
+    public void RegisterState(T type, IState state)
     {
-        SetState(stato);
+        if (_states.ContainsKey(type))
+        {           
+            throw new Exception("Stato gia Presente" + type);
+        }
+        _states.Add(type, state);
     }
 
-
-    public void StateUpdate()
+    public void SetState(T type)
     {
-        if (statoCorrente != null)
-            statoCorrente.Execute();
-    }
-
-    public void SetState(IState nuovoStato)
-    {
-        if (statoCorrente != null)
+      if(!_states.ContainsKey(type)) 
         {
-            statoCorrente.Exit();
+            throw new Exception("Stato non registrato" + type);
         }
 
-        statoCorrente = nuovoStato;
+      _currentState?.OnExit();
+      _currentState = _states[type];
+        _currentState.OnEnter();
+    }
 
-        if (statoCorrente != null)
-        {
-            statoCorrente.Enter();
-        }
+    public void Update() => _currentState?.OnUpdate();
 
-
-
+   
     }
 
 
@@ -49,4 +50,3 @@ public class StateMachine : MonoBehaviour
 
 
 
-}
